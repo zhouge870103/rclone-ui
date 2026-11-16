@@ -1,5 +1,3 @@
-import * as Sentry from '@sentry/browser'
-import { getVersion as getUiVersion } from '@tauri-apps/api/app'
 import { Channel, invoke } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
@@ -8,13 +6,10 @@ import { ask, message } from '@tauri-apps/plugin-dialog'
 import { debug, error, info, trace, warn } from '@tauri-apps/plugin-log'
 import { platform } from '@tauri-apps/plugin-os'
 import { exit, relaunch } from '@tauri-apps/plugin-process'
-import { type Update, check } from '@tauri-apps/plugin-updater'
 import pRetry from 'p-retry'
-import { defaultOptions } from 'tauri-plugin-sentry-api'
 import { getDeepLinkUrl, handleDeepLinkUrl } from './lib/deep'
 import { CLOSE_APP, RELAUNCH_APP, RESTART_RCLONE, type RestartRclonePayload } from './lib/events'
 import { LOCAL_HOST_ID, RC_PORT, getHostInfo, makeLocalHost } from './lib/hosts'
-import { validateLicense } from './lib/license'
 import {
     clearWatchedJobs,
     dispatchNotification,
@@ -25,7 +20,6 @@ import {
 import queryClient from './lib/query'
 import { listTransfers, startMount } from './lib/rclone/api'
 import rcloneClient from './lib/rclone/client'
-import { compareVersions } from './lib/rclone/common'
 import { initRclone } from './lib/rclone/init'
 import { AutomountSourceError, listMountSource, probeMountSource } from './lib/rclone/mount'
 import { reconcileConfigSync } from './lib/rclone/versions'
@@ -61,14 +55,8 @@ async function killRcloneDaemon() {
     }
 }
 
-try {
-    Sentry.init({
-        ...defaultOptions,
-        sendDefaultPii: false,
-    })
-} catch {
-    console.error('Error initializing Sentry')
-}
+// 内部版：移除 Sentry 遥测。保留空实现以兼容既有调用点，不向外发送任何数据。
+const Sentry = { captureException: (_e?: unknown) => {} }
 
 // forward console logs in webviews to the tauri logger, so they show up in terminal
 function forwardConsole(
@@ -202,45 +190,9 @@ async function checkHostReachability(): Promise<void> {
 }
 
 async function validateInstance() {
-    console.log('[validateInstance] validating license')
-
-    const licenseKey = usePersistedStore.getState().licenseKey
-    if (!licenseKey) {
-        console.log('[validateInstance] no license key, skipping license validation')
-        usePersistedStore.setState({ licenseValid: false })
-        return
-    }
-
-    if (!navigator.onLine) {
-        console.log('[validateInstance] not online, skipping license validation')
-        return
-    }
-
-    try {
-        await validateLicense(licenseKey)
-    } catch (e) {
-        console.log('[validateInstance] error validating license, marking as invalid')
-        usePersistedStore.setState({ licenseValid: false })
-
-        if (e instanceof Error) {
-            await message(e.message, {
-                title: 'Error Validating License',
-                kind: 'error',
-                okLabel: 'OK',
-            })
-            console.log('[validateInstance] error message displayed, returning')
-            return
-        }
-
-        await message('An error occurred while validating your license. Please try again.', {
-            title: 'Error',
-            kind: 'error',
-            okLabel: 'OK',
-        })
-        console.log('[validateInstance] default error message displayed, returning')
-    } finally {
-        console.log('[validateInstance] license validation complete')
-    }
+    // 内部版：不做联网许可证校验，直接全量解锁。
+    console.log('[validateInstance] internal build, license always valid')
+    usePersistedStore.setState({ licenseValid: true })
 }
 
 async function checkAlreadyRunning() {
@@ -693,132 +645,7 @@ async function showStartup() {
     console.log('[showStartup] startup hidden')
 }
 
-async function installUpdate(update: Update, required: boolean) {
-    const confirmed = await ask(
-        'You are running an outdated version of Rclone UI. Please update to the latest version.',
-        {
-            title: required ? 'Update Required' : 'Update Available',
-            kind: 'info',
-            okLabel: 'Update',
-            cancelLabel: required ? 'Exit' : 'Cancel',
-        }
-    )
-
-    if (!confirmed) {
-        console.log('[checkVersion] user cancelled update')
-        if (required) {
-            return await exit(0)
-        }
-        return
-    }
-
-    if (await invoke<boolean>('is_flatpak')) {
-        console.log('[checkVersion] flatpak detected, skipping update')
-
-        await message(
-            'A Flatpak version cannot update itself. Please update Rclone UI through your software manager.',
-            {
-                title: required ? 'Update Required' : 'Update Available',
-                kind: 'info',
-                okLabel: required ? 'Exit' : 'OK',
-            }
-        )
-
-        if (required) {
-            return await exit(0)
-        }
-
-        return
-    }
-
-    console.log('[checkVersion] downloading and installing update')
-
-    await update.downloadAndInstall()
-
-    console.log('[checkVersion] update downloaded and installed')
-
-    await message('Rclone UI has been updated. Please restart the application.', {
-        title: 'Update Complete',
-        kind: 'info',
-        okLabel: 'Restart',
-    })
-
-    console.log('[checkVersion] relaunching app')
-
-    // Direct relaunch: at checkVersion time no daemon exists yet (before startRclone), so the
-    // shutdown path is unnecessary; the old emit fired before any listener existed and was
-    // dropped, leaving the app running the old version.
-    await relaunch()
-}
-
-async function checkVersion() {
-    console.log('[checkVersion]')
-
-    try {
-        console.log('[checkVersion] fetching meta.json')
-
-        const latestMeta = await fetch('https://rcloneui.com/latest')
-        console.log('[checkVersion] meta.json fetched')
-
-        const latestMetaData = (await latestMeta.json()) as {
-            minimumVersion: string
-            okVersion: string
-        }
-        console.log('[checkVersion] meta.json parsed')
-
-        const { minimumVersion, okVersion } = latestMetaData
-
-        console.log('[checkVersion] minimumVersion', minimumVersion)
-        console.log('[checkVersion] okVersion', okVersion)
-
-        const currentVersion = await getUiVersion()
-        console.log('[checkVersion] currentVersion', currentVersion)
-
-        if (
-            compareVersions(currentVersion, minimumVersion) >= 0 &&
-            compareVersions(currentVersion, okVersion) >= 0
-        ) {
-            console.log('[checkVersion] currentVersion is up to date')
-            return
-        }
-
-        console.log('[checkVersion] checking for update')
-
-        const receivedUpdate = await check({
-            allowDowngrades: true,
-            timeout: 30000,
-        })
-
-        console.log('[checkVersion] update check complete')
-
-        if (!receivedUpdate) {
-            console.log('[checkVersion] no update found')
-            return
-        }
-
-        dispatchNotification('app.update-available', {
-            title: 'Rclone UI update available',
-            body: `Version ${receivedUpdate.version} is available (current: ${currentVersion})`,
-            data: {
-                currentVersion,
-                latestVersion: receivedUpdate.version,
-                minimumVersion,
-                okVersion,
-            },
-        })
-
-        if (compareVersions(currentVersion, minimumVersion) < 0) {
-            console.log('[checkVersion] currentVersion is outdated')
-            await installUpdate(receivedUpdate, true)
-        } else if (compareVersions(currentVersion, okVersion) < 0) {
-            console.log('[checkVersion] checking for update')
-            await installUpdate(receivedUpdate, false)
-        }
-    } catch (error) {
-        console.error('[checkVersion] error', error)
-        Sentry.captureException(error)
-    }
-}
+// 内部版：已移除应用自动更新逻辑（原 installUpdate / checkVersion）。
 
 async function checkRclone() {
     let currentHost = selectCurrentHost(usePersistedStore.getState()) ?? makeLocalHost()
@@ -910,7 +737,6 @@ waitForHydration()
     .then(() => initializeHostStore())
     .then(() => checkHostReachability())
     .then(() => registerRcloneWindowListeners())
-    .then(() => checkVersion())
     .then(() => validateInstance())
     .then(() => checkAlreadyRunning())
     .then(() => startRclone())

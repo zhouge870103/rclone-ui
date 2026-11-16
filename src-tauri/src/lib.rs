@@ -1,9 +1,7 @@
 use machine_uid;
-use sentry;
 use std::fs;
 use sysinfo::System;
 use tauri::{AppHandle, Manager};
-use tauri_plugin_sentry;
 use tinyfiledialogs as tfd;
 
 #[path = "../common/shortcut.rs"]
@@ -822,16 +820,7 @@ async fn test_proxy_connection(proxy_url: String) -> Result<String, String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let client = sentry::init((
-        "https://7c7c55918ff850112780d2b2b29121a6@o4508503751983104.ingest.de.sentry.io/4508739164110928",
-        sentry::ClientOptions {
-            release: sentry::release_name!(),
-            ..Default::default()
-        },
-    ));
-
-    let _guard = tauri_plugin_sentry::minidump::init(&client);
-
+    // 内部版：已移除 Sentry 崩溃上报。
     let mut builder = tauri::Builder::default();
 
     if !is_flatpak() {
@@ -852,9 +841,7 @@ pub fn run() {
             zookeeper::DaemonState::default(),
         ))
         .plugin(tauri_plugin_deep_link::init())
-        .plugin(tauri_plugin_sentry::init_with_no_injection(&client))
         .plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_process::init())

@@ -130,8 +130,9 @@ export const usePersistedStore = create<PersistedStateV2>()(
 
             licenseKey: undefined,
             setLicenseKey: (key: string | undefined) => set((_) => ({ licenseKey: key })),
-            licenseValid: false,
-            setLicenseValid: (valid: boolean) => set((_) => ({ licenseValid: valid })),
+            // 内部版：Pro 功能全量解锁，licenseValid 恒为 true（不再依赖联网许可证校验）。
+            licenseValid: true,
+            setLicenseValid: (_valid: boolean) => set((_) => ({ licenseValid: true })),
 
             startOnBoot: false,
             setStartOnBoot: (startOnBoot: boolean) => set((_) => ({ startOnBoot })),
@@ -328,7 +329,8 @@ export const usePersistedStore = create<PersistedStateV2>()(
                     return {
                         settingsPass: legacyState.settingsPass || undefined,
                         licenseKey: legacyState.licenseKey || undefined,
-                        licenseValid: legacyState.licenseValid || false,
+                        // 内部版：全量解锁，忽略旧状态里的 licenseValid。
+                        licenseValid: true,
                         startOnBoot: legacyState.startOnBoot || false,
                         templates: newTemplates,
                         hideStartup: legacyState.hideStartup || false,

@@ -1,4 +1,4 @@
-import * as Sentry from '@sentry/browser'
+import * as Sentry from './sentry'
 import { message } from '@tauri-apps/plugin-dialog'
 
 // Signals that the user explicitly stopped a call (e.g. dismissed the reconnect prompt), so retry

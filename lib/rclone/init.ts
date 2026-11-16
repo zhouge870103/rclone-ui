@@ -1,4 +1,4 @@
-import * as Sentry from '@sentry/browser'
+import * as Sentry from '../sentry'
 import { invoke } from '@tauri-apps/api/core'
 import { appLogDir, sep } from '@tauri-apps/api/path'
 import { ask, message } from '@tauri-apps/plugin-dialog'

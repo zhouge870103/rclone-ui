@@ -228,10 +228,6 @@
             ]
         },
         "opener:allow-default-urls",
-        "updater:allow-download",
-        "updater:allow-download-and-install",
-        "updater:allow-check",
-        "updater:allow-install",
         "autostart:allow-enable",
         "autostart:allow-disable",
         "autostart:allow-is-enabled",
@@ -250,9 +246,6 @@
         "process:default",
         "notification:default",
         "os:default",
-        "sentry:allow-event",
-        "sentry:allow-breadcrumb",
-        "sentry:allow-envelope",
         "deep-link:default",
         "deep-link:allow-get-current"
     ]

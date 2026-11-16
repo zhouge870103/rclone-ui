@@ -2,7 +2,7 @@
 
 fn main() {
     // Headless scheduled-task mode: `"Rclone UI" run-task <taskId> [--host <hostId>]`, invoked
-    // by cron/Task Scheduler. Handled BEFORE app_lib::run() so no GUI, Sentry, or
+    // by cron/Task Scheduler. Handled BEFORE app_lib::run() so no GUI or
     // single-instance plugin ever initializes (the plugin would otherwise intercept this
     // process and just pop the running app's toolbar).
     let args: Vec<String> = std::env::args().collect();

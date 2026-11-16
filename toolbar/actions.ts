@@ -1,4 +1,4 @@
-import { captureException } from '@sentry/browser'
+import { captureException } from '../lib/sentry'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { ask, message } from '@tauri-apps/plugin-dialog'
 import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener'
